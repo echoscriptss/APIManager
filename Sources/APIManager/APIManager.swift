@@ -6,7 +6,12 @@
 //
 //  Created by Prabhjot Singh on 05/01/26.
 //
-
+/**
+ - Madate -
+    * Check both positivive and negative cases for api calling
+    * Login - email and password -> response(Temp. token & otp on phone) --- Verify (Params - temp token & OTP) -> Response (Token) -- use this in all Api as Bearer token...
+    * UUID will be used to update the user .
+ */
 import Foundation
 import SwiftUI
 import SVProgressHUD
