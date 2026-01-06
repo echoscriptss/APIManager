@@ -76,9 +76,8 @@ public final class APIManager {
     guard let httpResponse = response as? HTTPURLResponse else {
       throw APIError.invalidResponse
     }
-    
-    guard (200...299).contains(httpResponse.statusCode) else {
-      throw APIError.serverError(httpResponse.statusCode)
+    guard (200...404).contains(httpResponse.statusCode) else {
+           throw APIError.serverError(httpResponse.statusCode)
     }
     
     do {
@@ -138,8 +137,8 @@ public final class APIManager {
       throw APIError.invalidResponse
     }
     
-    guard (200...299).contains(httpResponse.statusCode) else {
-      throw APIError.serverError(httpResponse.statusCode)
+    guard (200...404).contains(httpResponse.statusCode) else {
+           throw APIError.serverError(httpResponse.statusCode)
     }
     
     do {
