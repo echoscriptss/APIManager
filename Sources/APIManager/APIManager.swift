@@ -79,6 +79,8 @@ public final class APIManager {
 //    let (data, response) = try await URLSession.shared.data(for: request)
       do {
           let (data, response) = try await URLSession.shared.data(for: request)
+          Indicator.sharedInstance.hideIndicator()
+
           guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
           }
@@ -91,12 +93,11 @@ public final class APIManager {
           } catch {
             throw APIError.decodingError
           }
-          Indicator.sharedInstance.hideIndicator()
 
           // Handle success
       } catch {
-          throw APIError.custom(error.localizedDescription)
           Indicator.sharedInstance.hideIndicator()
+          throw APIError.custom(error.localizedDescription)
 
       }
    
