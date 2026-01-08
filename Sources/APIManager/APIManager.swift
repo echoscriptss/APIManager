@@ -76,20 +76,30 @@ public final class APIManager {
     }
     
     // API Call
-    let (data, response) = try await URLSession.shared.data(for: request)
-    Indicator.sharedInstance.hideIndicator()
-    guard let httpResponse = response as? HTTPURLResponse else {
-      throw APIError.invalidResponse
-    }
-    guard (200...404).contains(httpResponse.statusCode) else {
-           throw APIError.serverError(httpResponse.statusCode)
-    }
-    
-    do {
-      return try JSONDecoder().decode(T.self, from: data)
-    } catch {
-      throw APIError.decodingError
-    }
+//    let (data, response) = try await URLSession.shared.data(for: request)
+      do {
+          let (data, response) = try await URLSession.shared.data(for: request)
+          guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+          }
+          guard (200...404).contains(httpResponse.statusCode) else {
+                 throw APIError.serverError(httpResponse.statusCode)
+          }
+          
+          do {
+            return try JSONDecoder().decode(T.self, from: data)
+          } catch {
+            throw APIError.decodingError
+          }
+          Indicator.sharedInstance.hideIndicator()
+
+          // Handle success
+      } catch {
+          handleNetworkError(error)
+          Indicator.sharedInstance.hideIndicator()
+
+      }
+   
   }
   
   //MARK: - API Multipart request methods
