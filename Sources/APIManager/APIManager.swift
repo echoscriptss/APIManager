@@ -95,7 +95,7 @@ public final class APIManager {
 
           // Handle success
       } catch {
-          handleNetworkError(error)
+          throw APIError.custom(error.localizedDescription)
           Indicator.sharedInstance.hideIndicator()
 
       }
