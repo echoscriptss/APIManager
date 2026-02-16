@@ -89,10 +89,17 @@ public final class APIManager {
           }
           
           do {
-            return try JSONDecoder().decode(T.self, from: data)
+              let decoded = try JSONDecoder().decode(T.self, from: data)
+              return decoded
+          } catch let error as DecodingError {
+              print("❌ Decoding Error:", error)
+              print("📦 Raw JSON:", String(data: data, encoding: .utf8) ?? "nil")
+              throw error
           } catch {
-            throw APIError.decodingError
+              print("❌ Unknown Error:", error)
+              throw error
           }
+
 
           // Handle success
       } catch {
