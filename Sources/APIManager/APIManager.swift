@@ -87,7 +87,8 @@ public final class APIManager {
           guard (200...404).contains(httpResponse.statusCode) else {
                  throw APIError.serverError(httpResponse.statusCode)
           }
-          
+          print(String(data: data, encoding: .utf8) ?? "Invalid JSON")
+
           do {
               let decoded = try JSONDecoder().decode(T.self, from: data)
               return decoded
