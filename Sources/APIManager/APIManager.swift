@@ -272,12 +272,11 @@ public final class APIManager {
         guard (200...299).contains(httpResponse.statusCode) else {
             throw APIError.serverError(httpResponse.statusCode)
         }
-
+        
         do {
-            return try JSONDecoder().decode(T.self, from: data)
+          return try JSONDecoder().decode(T.self, from: data)
         } catch {
-            let raw = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw APIError.decodingError(raw)
+          throw APIError.decodingError
         }
     }
 
