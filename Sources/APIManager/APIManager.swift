@@ -38,6 +38,33 @@ enum APIError: LocalizedError {
         }
     }
 }
+extension Data {
+    mutating func appendString(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
+    }
+}
+public struct MultipartFile {
+    public let data: Data
+    public let name: String        // form field name (e.g. "file")
+    public let fileName: String
+    public let mimeType: String
+
+    public init(
+        data: Data,
+        name: String,
+        fileName: String,
+        mimeType: String
+    ) {
+        self.data = data
+        self.name = name
+        self.fileName = fileName
+        self.mimeType = mimeType
+    }
+}
+
+
 
 @MainActor
 public final class APIManager {
@@ -199,7 +226,92 @@ public final class APIManager {
       body.append("--\(boundary)--\(lineBreak)")
       return body
   }
-  
+    
+    // MARK: - Upload Method
+    public func uploadDocumentFiles<T: Decodable>(url: URL?,  methodType: String,  headers: [String: String] = [:], parameters: [String: String] = [:], files: [MultipartFile], responseType: T.Type) async throws -> T {
+
+        if Indicator.isEnabledIndicator {
+            Indicator.sharedInstance.showIndicator()
+
+        }
+
+        defer {
+            Indicator.sharedInstance.hideIndicator()
+        }
+
+        guard let url = url else {
+            throw APIError.invalidURL
+        }
+
+        let boundary = UUID().uuidString
+
+        var request = URLRequest(url: url)
+        request.httpMethod = methodType
+        request.setValue("multipart/form-data; boundary=\(boundary)",
+                         forHTTPHeaderField: "Content-Type")
+
+        headers.forEach {
+            request.setValue($0.value, forHTTPHeaderField: $0.key)
+        }
+
+        let body = createMultipartBody(
+            boundary: boundary,
+            parameters: parameters,
+            files: files
+        )
+
+        request.httpBody = body
+        request.setValue("\(body.count)", forHTTPHeaderField: "Content-Length")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.serverError(httpResponse.statusCode)
+        }
+
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            let raw = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw APIError.decodingError(raw)
+        }
+    }
+
+    // MARK: - Multipart Body
+    private func createMultipartBody(
+        boundary: String,
+        parameters: [String: String],
+        files: [MultipartFile]
+    ) -> Data {
+
+        let lineBreak = "\r\n"
+        var body = Data()
+
+        // Parameters
+        for (key, value) in parameters {
+            body.appendString("--\(boundary)\(lineBreak)")
+            body.appendString("Content-Disposition: form-data; name=\"\(key)\"\(lineBreak)\(lineBreak)")
+            body.appendString("\(value)\(lineBreak)")
+        }
+
+        // Files
+        for file in files {
+            body.appendString("--\(boundary)\(lineBreak)")
+            body.appendString(
+                "Content-Disposition: form-data; name=\"\(file.name)\"; filename=\"\(file.fileName)\"\(lineBreak)"
+            )
+            body.appendString("Content-Type: \(file.mimeType)\(lineBreak)\(lineBreak)")
+            body.append(file.data)
+            body.appendString(lineBreak)
+        }
+
+        body.appendString("--\(boundary)--\(lineBreak)")
+        return body
+    }
 }
 
 struct AnyEncodable: Encodable {
