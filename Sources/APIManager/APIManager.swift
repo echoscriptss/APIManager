@@ -111,7 +111,7 @@ public final class APIManager {
           guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
           }
-          guard (200...404).contains(httpResponse.statusCode) else {
+          guard (200...422).contains(httpResponse.statusCode) else {
                  throw APIError.serverError(httpResponse.statusCode)
           }
           print(String(data: data, encoding: .utf8) ?? "Invalid JSON")
