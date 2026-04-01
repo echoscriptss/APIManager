@@ -188,7 +188,7 @@ public final class APIManager {
       throw APIError.invalidResponse
     }
     
-    guard (200...404).contains(httpResponse.statusCode) else {
+    guard (200...422).contains(httpResponse.statusCode) else {
            throw APIError.serverError(httpResponse.statusCode)
     }
     
@@ -269,7 +269,7 @@ public final class APIManager {
             throw APIError.invalidResponse
         }
 
-        guard (200...299).contains(httpResponse.statusCode) else {
+        guard (200...422).contains(httpResponse.statusCode) else {
             throw APIError.serverError(httpResponse.statusCode)
         }
         
