@@ -116,10 +116,10 @@ public final class APIManager {
           guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
           }
+          if httpResponse.statusCode == 401 {
+              NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+          }
           guard (200...422).contains(httpResponse.statusCode) else {
-              if httpResponse.statusCode == 401 {
-                  NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
-              }
                  throw APIError.serverError(httpResponse.statusCode)
               
           }
@@ -196,11 +196,10 @@ public final class APIManager {
     guard let httpResponse = response as? HTTPURLResponse else {
       throw APIError.invalidResponse
     }
-    
+      if httpResponse.statusCode == 401 {
+          NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+      }
     guard (200...422).contains(httpResponse.statusCode) else {
-        if httpResponse.statusCode == 401 {
-            NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
-        }
            throw APIError.serverError(httpResponse.statusCode)
     }
     
@@ -280,11 +279,11 @@ public final class APIManager {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
-
+        if httpResponse.statusCode == 401 {
+            NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+        }
         guard (200...422).contains(httpResponse.statusCode) else {
-            if httpResponse.statusCode == 401 {
-                NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
-            }
+            
             throw APIError.serverError(httpResponse.statusCode)
         }
         
