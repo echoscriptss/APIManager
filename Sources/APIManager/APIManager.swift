@@ -16,6 +16,11 @@ import Foundation
 import SwiftUI
 import SVProgressHUD
 
+extension Notification.Name {
+    static let apiUnauthorized = Notification.Name("AuthTokenExpired")
+}
+
+
 enum APIError: LocalizedError {
     case invalidURL
     case invalidResponse
@@ -112,7 +117,11 @@ public final class APIManager {
             throw APIError.invalidResponse
           }
           guard (200...422).contains(httpResponse.statusCode) else {
+              if httpResponse.statusCode == 401 {
+                  NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+              }
                  throw APIError.serverError(httpResponse.statusCode)
+              
           }
           print(String(data: data, encoding: .utf8) ?? "Invalid JSON")
 
@@ -189,6 +198,9 @@ public final class APIManager {
     }
     
     guard (200...422).contains(httpResponse.statusCode) else {
+        if httpResponse.statusCode == 401 {
+            NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+        }
            throw APIError.serverError(httpResponse.statusCode)
     }
     
@@ -270,6 +282,9 @@ public final class APIManager {
         }
 
         guard (200...422).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 {
+                NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+            }
             throw APIError.serverError(httpResponse.statusCode)
         }
         
