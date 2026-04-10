@@ -123,7 +123,7 @@ public final class APIManager {
                  throw APIError.serverError(httpResponse.statusCode)
               
           }
-          print(String(data: data, encoding: .utf8) ?? "Invalid JSON")
+         // print(String(data: data, encoding: .utf8) ?? "Invalid JSON")
 
           do {
               let decoded = try JSONDecoder().decode(T.self, from: data)
