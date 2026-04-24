@@ -17,7 +17,8 @@ import SwiftUI
 import SVProgressHUD
 
 extension Notification.Name {
-    static let apiUnauthorized = Notification.Name("AuthTokenExpired")
+    static let refreshTokenUnauthorized = Notification.Name("RefreshTokenExpired") // for refresh token expire and logout
+    static let accessTokenRefreshed = Notification.Name("AccessTokenRefreshed")
 }
 
 
@@ -69,17 +70,41 @@ public struct MultipartFile {
     }
 }
 
+public struct refreshTokenModel: Encodable {
+    public let refreshToken: String
+}
 
+struct refreshResponse: Codable {
+    let success: Bool?
+    let statusCode: Int?
+    let path: String?
+    let timestamp: String?
+    let message: String?
+    let error: String?
+    let data: dataToken?
+}
+
+struct dataToken: Codable {
+    let accessToken: String?
+    let refreshToken: String?
+
+}
 
 @MainActor
 public final class APIManager {
 
     public static let shared = APIManager()
-
+    private var authtoken = ""
+    private var refreshtoken = ""
+    private var refreshURL = ""
     private init() {}
   
   //MARK: - API request method
 
+    /*
+     1. header = nil and 401 - non auth api -- do nothing
+     2. header != nil and 401 - auth expired -- use refreshtoken and get auth
+     */
  public func request<T: Decodable>(
     url: URL?,
     methodType: String,
@@ -97,18 +122,35 @@ public final class APIManager {
     }
     
     // Request
+// ---------------------------------------------------------------------------------------
     var request = URLRequest(url: url)
     request.httpMethod = methodType
-    
-    headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-    
+      if let token = headers["Authorization"] {
+          authtoken = token
+      }
+      if let token = headers["RefreshToken"] {
+          refreshtoken = token
+      }
+      if let url = headers["BaseUrl"] {
+          refreshURL = "\(url)/mobile/auth/refresh"
+      }
+      
+      headers.forEach { key, value in
+          if key == "Authorization" {
+              request.setValue(value, forHTTPHeaderField: key)
+          }
+          if key == "X-Reset-Token" {
+              request.setValue(value, forHTTPHeaderField: key)
+          }
+      }
+// ---------------------------------------------------------------------------------------
+      
+      
     if let body {
       request.httpBody = try JSONEncoder().encode(AnyEncodable(body))
       request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     }
     
-    // API Call
-//    let (data, response) = try await URLSession.shared.data(for: request)
       do {
           let (data, response) = try await URLSession.shared.data(for: request)
           Indicator.sharedInstance.hideIndicator()
@@ -116,9 +158,20 @@ public final class APIManager {
           guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
           }
-          if httpResponse.statusCode == 401 {
-              NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+         
+          if headers.count > 0 && httpResponse.statusCode == 401 {
+              // make api call for refresh
+              let refreshToken = refreshTokenModel(refreshToken: refreshtoken)
+              let success = try await handle401(url: URL(string: refreshURL), methodType: "POST", body: refreshToken, responseType: refreshResponse.self)
+             
+              if success.success ?? false {
+                  let headerAuthToken = ["Authorization" : "Bearer \(success.data?.accessToken ?? "")"]
+                  return try await self.request(url: url, methodType: methodType, headers: headerAuthToken, body: body, responseType: T.self)
+              } else {
+                  throw URLError(.userAuthenticationRequired)
+              }
           }
+          
           guard (200...422).contains(httpResponse.statusCode) else {
                  throw APIError.serverError(httpResponse.statusCode)
               
@@ -144,8 +197,9 @@ public final class APIManager {
           throw APIError.custom(error.localizedDescription)
 
       }
-   
   }
+    
+   
   
   //MARK: - API Multipart request methods
   
@@ -172,7 +226,29 @@ public final class APIManager {
     
     let boundary = UUID().uuidString
     
-    var request = URLRequest(url: url)
+//    var request = URLRequest(url: url)
+      
+      var request = URLRequest(url: url)
+      request.httpMethod = methodType
+        if let token = headers["Authorization"] {
+            authtoken = token
+        }
+        if let token = headers["RefreshToken"] {
+            refreshtoken = token
+        }
+        if let url = headers["BaseUrl"] {
+            refreshURL = "\(url)/mobile/auth/refresh"
+        }
+        
+        headers.forEach { key, value in
+            if key == "Authorization" {
+                request.setValue(value, forHTTPHeaderField: key)
+            }
+            if key == "X-Reset-Token" {
+                request.setValue(value, forHTTPHeaderField: key)
+            }
+        }
+
     request.httpMethod = methodType
     request.setValue("multipart/form-data; boundary=\(boundary)",
                      forHTTPHeaderField: "Content-Type")
@@ -197,7 +273,18 @@ public final class APIManager {
       throw APIError.invalidResponse
     }
       if httpResponse.statusCode == 401 {
-          NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+          
+          let refreshToken = refreshTokenModel(refreshToken: refreshtoken)
+          let success = try await handle401(url: URL(string: refreshURL), methodType: "POST", body: refreshToken, responseType: refreshResponse.self)
+         
+          if success.success ?? false {
+              let headerAuthToken = ["Authorization" : "Bearer \(success.data?.accessToken ?? "")"]
+              return try await self.multipartRequest(url: url, methodType: methodType, imageData: imageData, responseType: responseType)
+//              return try await self.request(url: url, methodType: methodType, headers: headerAuthToken, body: body, responseType: T.self)
+          } else {
+              throw URLError(.userAuthenticationRequired)
+          }
+
       }
     guard (200...422).contains(httpResponse.statusCode) else {
            throw APIError.serverError(httpResponse.statusCode)
@@ -256,7 +343,30 @@ public final class APIManager {
 
         let boundary = UUID().uuidString
 
+//        var request = URLRequest(url: url)
+        
         var request = URLRequest(url: url)
+        request.httpMethod = methodType
+          if let token = headers["Authorization"] {
+              authtoken = token
+          }
+          if let token = headers["RefreshToken"] {
+              refreshtoken = token
+          }
+          if let url = headers["BaseUrl"] {
+              refreshURL = "\(url)/mobile/auth/refresh"
+          }
+          
+          headers.forEach { key, value in
+              if key == "Authorization" {
+                  request.setValue(value, forHTTPHeaderField: key)
+              }
+              if key == "X-Reset-Token" {
+                  request.setValue(value, forHTTPHeaderField: key)
+              }
+          }
+
+        
         request.httpMethod = methodType
         request.setValue("multipart/form-data; boundary=\(boundary)",
                          forHTTPHeaderField: "Content-Type")
@@ -280,7 +390,18 @@ public final class APIManager {
             throw APIError.invalidResponse
         }
         if httpResponse.statusCode == 401 {
-            NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+            
+            let refreshToken = refreshTokenModel(refreshToken: refreshtoken)
+            let success = try await handle401(url: URL(string: refreshURL), methodType: "POST", body: refreshToken, responseType: refreshResponse.self)
+           
+            if success.success ?? false {
+                let headerAuthToken = ["Authorization" : "Bearer \(success.data?.accessToken ?? "")"]
+                return try await self.uploadDocumentFiles(url: url, methodType: methodType, files: files, responseType: responseType)
+  //              return try await self.request(url: url, methodType: methodType, headers: headerAuthToken, body: body, responseType: T.self)
+            } else {
+                throw URLError(.userAuthenticationRequired)
+            }
+
         }
         guard (200...422).contains(httpResponse.statusCode) else {
             
@@ -325,6 +446,79 @@ public final class APIManager {
         body.appendString("--\(boundary)--\(lineBreak)")
         return body
     }
+    
+    // -------------------------------------------------------------------------------------------------------------------------------------
+    fileprivate func handle401<T: Decodable>(url: URL?, methodType: String, body: Encodable? = nil, responseType: T.Type) async throws -> T {
+        if Indicator.isEnabledIndicator {
+          Indicator.sharedInstance.showIndicator()
+        }
+        
+        guard let url = url else {
+          throw APIError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = methodType
+        
+        if let body {
+          request.httpBody = try JSONEncoder().encode(AnyEncodable(body))
+          request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        
+        // API Call
+    //    let (data, response) = try await URLSession.shared.data(for: request)
+          do {
+              let (data, response) = try await URLSession.shared.data(for: request)
+              Indicator.sharedInstance.hideIndicator()
+
+              guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.invalidResponse
+              }
+              /*
+               1. header = nil and 401 - non auth api -- do nothing
+               2. header != nil and 401 - auth expired -- use refreshtoken and get auth
+               
+               */
+              if httpResponse.statusCode == 401 {
+                  NotificationCenter.default.post(name: .refreshTokenUnauthorized, object: nil)
+              }
+              guard (200...422).contains(httpResponse.statusCode) else {
+                     throw APIError.serverError(httpResponse.statusCode)
+              }
+              do {
+                  if let response: refreshResponse = parseResponse(refreshResponse.self, data: data) {
+                      NotificationCenter.default.post(
+                      name: .accessTokenRefreshed,
+                      object: nil,
+                      userInfo: ["accessToken": response.data?.accessToken ?? "", "refreshToken" : response.data?.refreshToken ?? ""]
+                      )
+                  }
+
+                  let decoded = try JSONDecoder().decode(T.self, from: data)
+                  return decoded
+              } catch let error as DecodingError {
+                  print("❌ Decoding Error:", error)
+                  print("📦 Raw JSON:", String(data: data, encoding: .utf8) ?? "nil")
+                  throw error
+              } catch {
+                  print("❌ Unknown Error:", error)
+                  throw error
+              }
+
+              // Handle success
+          } catch {
+              Indicator.sharedInstance.hideIndicator()
+              throw APIError.custom(error.localizedDescription)
+          }
+      }
+    
+    func parseResponse<T: Decodable>(_ type: T.Type, data: Data) -> T? {
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+    
+    // -------------------------------------------------------------------------------------------------------------------------------------
+
+    
 }
 
 struct AnyEncodable: Encodable {
