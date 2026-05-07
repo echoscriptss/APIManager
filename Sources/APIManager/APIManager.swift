@@ -27,6 +27,7 @@ enum APIError: LocalizedError {
     case invalidResponse
     case decodingError
     case serverError(Int)
+    case noInternet
     case custom(String)
 
     var errorDescription: String? {
@@ -39,6 +40,8 @@ enum APIError: LocalizedError {
             return "Failed to decode response"
         case .serverError(let code):
             return "Server error: \(code)"
+        case .noInternet:
+            return "No internet connection. Please check your network and try again"
         case .custom(let message):
             return message
         }
@@ -189,13 +192,18 @@ public final class APIManager {
               print("❌ Unknown Error:", error)
               throw error
           }
-
-
           // Handle success
       } catch {
           Indicator.sharedInstance.hideIndicator()
+          if let urlError = error as? URLError {
+              switch urlError.code {
+              case .notConnectedToInternet, .networkConnectionLost:
+                  throw APIError.noInternet
+              default:
+                  throw APIError.custom(urlError.localizedDescription)
+              }
+          }
           throw APIError.custom(error.localizedDescription)
-
       }
   }
     
@@ -506,11 +514,21 @@ public final class APIManager {
               }
 
               // Handle success
-          } catch {
-              Indicator.sharedInstance.hideIndicator()
-              throw APIError.custom(error.localizedDescription)
           }
-      }
+        catch {
+            Indicator.sharedInstance.hideIndicator()
+
+            if let urlError = error as? URLError {
+                switch urlError.code {
+                case .notConnectedToInternet, .networkConnectionLost:
+                    throw APIError.noInternet   // 👈 handle here
+                default:
+                    throw APIError.custom(urlError.localizedDescription)
+                }
+            }
+
+            throw APIError.custom(error.localizedDescription)
+        }      }
     
     func parseResponse<T: Decodable>(_ type: T.Type, data: Data) -> T? {
         return try? JSONDecoder().decode(T.self, from: data)
